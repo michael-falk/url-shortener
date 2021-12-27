@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -51,7 +52,8 @@ func HandleNewShortLinkRequest(id string, req NewShortLinkRequest, w http.Respon
 	if req.ExpireAt == nil {
 		fmt.Fprintf(w, "Created short link: %s for long url: %s\n", id, req.Url)
 	} else {
-		fmt.Fprintf(w, "Created short link: %s for long url: %s and expiryAt: %s\n", id, req.Url, *req.ExpireAt)
+		date, _ := time.Parse(time.RFC3339, *req.ExpireAt) //RFC 3339 is a profile for ISO 8601
+		fmt.Fprintf(w, "Created short link: %s for long url: %s and expiryAt: %v\n", id, req.Url, date)
 	}
 }
 
