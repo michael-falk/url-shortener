@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -9,15 +11,48 @@ import (
 	"github.com/gorilla/mux"
 )
 
+type NewShortLinkRequest struct {
+	Url      string  `json:"url"`
+	ExpireAt *string `json:"expireAt,omitempty"` // RFC3339 datetime
+}
+
+// From https://golangdocs.com/generate-random-string-in-golang
+// Decided for case-insensitivity so lowercase only
+func RandomString(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
+
+	s := make([]rune, n)
+	for i := range s {
+		s[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(s)
+}
+
 func CreateNamedShortLink(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["short_link"]
 
-	fmt.Fprintf(w, "Created named short link: %s\n", id)
+	var req NewShortLinkRequest
+	json.NewDecoder(r.Body).Decode(&req)
+
+	HandleNewShortLinkRequest(id, req, w)
 }
 
 func CreateRandomShortLink(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Created random short link: %s\n", "RANDOM")
+	var req NewShortLinkRequest
+	json.NewDecoder(r.Body).Decode(&req)
+
+	id := RandomString(6) // TODO make configurable
+
+	HandleNewShortLinkRequest(id, req, w)
+}
+
+func HandleNewShortLinkRequest(id string, req NewShortLinkRequest, w http.ResponseWriter) {
+	if req.ExpireAt == nil {
+		fmt.Fprintf(w, "Created short link: %s for long url: %s\n", id, req.Url)
+	} else {
+		fmt.Fprintf(w, "Created short link: %s for long url: %s and expiryAt: %s\n", id, req.Url, *req.ExpireAt)
+	}
 }
 
 func DeleteShortLink(w http.ResponseWriter, r *http.Request) {
