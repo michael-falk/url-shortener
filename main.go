@@ -13,8 +13,8 @@ import (
 )
 
 type NewShortLinkRequest struct {
-	Url      string  `json:"url"`
-	ExpireAt *string `json:"expireAt,omitempty"` // RFC3339 datetime
+	Url      string     `json:"url"`
+	ExpireAt *time.Time `json:"expireAt,omitempty"` // RFC3339 datetime
 }
 
 // From https://golangdocs.com/generate-random-string-in-golang
@@ -52,8 +52,7 @@ func HandleNewShortLinkRequest(id string, req NewShortLinkRequest, w http.Respon
 	if req.ExpireAt == nil {
 		fmt.Fprintf(w, "Created short link: %s for long url: %s\n", id, req.Url)
 	} else {
-		date, _ := time.Parse(time.RFC3339, *req.ExpireAt) //RFC 3339 is a profile for ISO 8601
-		fmt.Fprintf(w, "Created short link: %s for long url: %s and expiryAt: %v\n", id, req.Url, date)
+		fmt.Fprintf(w, "Created short link: %s for long url: %s and expiryAt: %v\n", id, req.Url, req.ExpireAt)
 	}
 }
 
