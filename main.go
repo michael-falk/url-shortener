@@ -96,6 +96,7 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 	httputil.NewSingleHostReverseProxy(url).ServeHTTP(w, r)
 }
 
+// lookup the long url for a given id/short_link
 func lookup(id string) string {
 	fmt.Println(id)
 	// return "http://google.com"
@@ -114,14 +115,7 @@ func main() {
 
 	router.HandleFunc("/s/{short_link}", proxy).Methods("GET")
 
-	// POST '/v1/admin/short-link/{:short_link?}' => create new short-link id if not specified. Otherwise try to create short_link. If allocated, fail. Optional request body includes `expireAt`
-	// DELETE '/v1/admin/short-link/:short_link =>
-	// GET '/v1/admin/short-link/analytics?ago=[24h,7d] # Will default to all time if argument not included. Otherwise, arbitrary lookback range
-
 	// TODO auth so that owning engineering team will have permissions to call the WRITE admin route for the short link. Using JWT semantics. Will not verify tokens. just check `sub` to identify tenant for short-links.
-
-	// using s prefix for short urls. Only supporting GET verb given the use case. Really tempted to cheat/implement with Caddy or implement a caddy plugin
-	// proxy GET '/s/:short_link' to lookup(short_link)
 
 	// DB schema: I want to learn postgres. Also probably good enough for a local fake service. I guess redis cache could be used but over-engineering for a docker-compose local app
 	// Table: URLS PK: short_link (hash), owner, destination
