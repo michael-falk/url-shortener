@@ -2,3 +2,26 @@
 # Postgres image + table init scripts
 # Prometheus + Grafana references i guess
 # Wire up postgres image into local build yadda yadda / https://github.com/jackc/pgx
+
+version: "3.9"
+services:
+  db:
+    image: postgres:latest
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    env_file:
+      - .env
+
+  url-shortener:
+    depends_on:
+      - db
+    build: 
+      context: .
+      dockerfile: url-shortener.dockerfile
+    ports:
+      - 8080:80
+
+volumes:
+  db-data:
