@@ -41,3 +41,5 @@ Project Requirements:
 
     Tests should be provided and able to be executed locally or within a test environment.
 
+## Note
+There's a [known bug](https://github.com/golang/go/pull/50339) in go's built-in reverse proxy library around trailing slashes. So for the purposes of this demo, I will require all destination URLs to support trailing/strict slashes.
