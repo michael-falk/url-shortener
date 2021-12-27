@@ -29,30 +29,39 @@ func RandomString(n int) string {
 	return string(s)
 }
 
+// TODO auth so that owning engineering team will have permissions to call the WRITE admin route for the short link. Using JWT semantics. Will not verify tokens. just check `sub` to identify tenant for short-links.
+// For now, cheat and make a custom X-SUBJECT header to pass in tenant information, etc.
+
 func CreateNamedShortLink(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["short_link"]
+	team := r.Header.Get("X-SUBJECT")
 
 	var req NewShortLinkRequest
 	json.NewDecoder(r.Body).Decode(&req)
 
-	HandleNewShortLinkRequest(id, req, w)
+	HandleNewShortLinkRequest(team, id, req, w)
 }
 
 func CreateRandomShortLink(w http.ResponseWriter, r *http.Request) {
 	var req NewShortLinkRequest
 	json.NewDecoder(r.Body).Decode(&req)
+	team := r.Header.Get("X-SUBJECT")
 
 	id := RandomString(6) // TODO make configurable
 
-	HandleNewShortLinkRequest(id, req, w)
+	HandleNewShortLinkRequest(team, id, req, w)
 }
 
-func HandleNewShortLinkRequest(id string, req NewShortLinkRequest, w http.ResponseWriter) {
+func HandleNewShortLinkRequest(team, id string, req NewShortLinkRequest, w http.ResponseWriter) {
+	if team == "" {
+		panic("No team")
+	}
+
 	if req.ExpireAt == nil {
-		fmt.Fprintf(w, "Created short link: %s for long url: %s\n", id, req.Url)
+		fmt.Fprintf(w, "Created %s's short link: %s for long url: %s\n", team, id, req.Url)
 	} else {
-		fmt.Fprintf(w, "Created short link: %s for long url: %s and expiryAt: %v\n", id, req.Url, req.ExpireAt)
+		fmt.Fprintf(w, "Created %s's short link: %s for long url: %s and expiryAt: %v\n", team, id, req.Url, req.ExpireAt)
 	}
 }
 
@@ -115,8 +124,6 @@ func main() {
 	shortLinkRouter.HandleFunc("/{short_link}/analytics", GetAnalyticsForShortLink).Methods("GET")
 
 	router.HandleFunc("/s/{short_link}", proxy).Methods("GET")
-
-	// TODO auth so that owning engineering team will have permissions to call the WRITE admin route for the short link. Using JWT semantics. Will not verify tokens. just check `sub` to identify tenant for short-links.
 
 	// DB schema: I want to learn postgres. Also probably good enough for a local fake service. I guess redis cache could be used but over-engineering for a docker-compose local app
 	// Table: URLS PK: short_link (hash), owner, destination
