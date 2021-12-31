@@ -67,9 +67,15 @@ func HandleNewShortLinkRequest(conn *pgxpool.Pool, tenant, id string, req NewSho
 		return
 	}
 
+	if req.Url == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Missing request body field: url")
+		return
+	}
+
 	_, err := url.Parse(req.Url)
 	if err != nil {
-		w.WriteHeader(http.StatusBadGateway)
+		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "Invalid destination URL")
 		return
 	}
@@ -80,8 +86,10 @@ func HandleNewShortLinkRequest(conn *pgxpool.Pool, tenant, id string, req NewSho
 		_, err = conn.Exec(context.Background(), "INSERT INTO urls (short_link, tenant, destination, expiry) VALUES ($1, $2, $3, $4)", id, tenant, req.Url, req.ExpireAt)
 	}
 
+	// err will be from a key-collision so respond with 409.
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusConflict)
+		fmt.Fprintf(w, "Short-URL already reserved: %s\n", id)
 		return
 	}
 
