@@ -1,45 +1,104 @@
 # url-shortener
-Proof-of-concept url shortener (to learn golang)
+Proof-of-concept url shortener (to learn golang).
 
-## Proposal
+## Design
+This design required support for the following:
 
-You've been asked to make an internal service for shortening URLs that anyone in the company can use. You can implement it in any way you see fit, including whatever backend functionality that you think makes sense. Please try to make it both end user and developer friendly. Please include a README with documentation on how to build, and run and test the system. Clearly state all assumptions and design decisions in the README. 
+> A short URL:
+> - Has one long URL
+> - This URL shortener should have a well-defined API for URLs created, including analytics of usage.
+> - No duplicate URLs are allowed to be created.
+> - Short links can expire at a future time or can live forever.
 
- 
+I made the following assumptions:
+- Users will supply valid destination URLs.
+  - Furthermore, because of a [known bug](https://github.com/golang/go/pull/50339) in go's built-in reverse proxy library around trailing slashes, destination urls will support strict trailing slashes.
+- Users in a production environment would use some auth mechanism (e.g. OAuth2) where claims can be used to determine access-control, etc. For simplicity, clients will explicitly set an `X-SUBJECT` header which would be analogous to a `JWT` `sub` claim.
+- Clients will not be able to modify a short-url in-place. Rather they will have to delete and recreate a URL.
+- The analytics endpoint will be strongly coupled to a short-url. If a link is deleted, so will the corresponding analytics data
+- The analytics endpoint will strictly support -7d, -24h, and all time. Nothing more complex or flexible.
+- An expired URL is not automatically deleted, rather disabled. An admin must delete the URL to free it.
 
-A short URL: 
+### Persistence
+To support other requirements around persistence and the expected queries, I chose to use PostgreSQL. I have 1 table as a KV store (a mapping from short_url to long_url) and another as append-log (for analytic queries around usage). I felt a single SQL store would satisfy all use cases rather than Mongo or ephemeral Redis.
 
-    Has one long URL 
+### Web API
+The Web API should be a straight-forward CRUD API to create a short-url and a shorter 'data-plane' API for the actual short-url.
+The routes are as follow:
+```
+# Management APIs
+# Requires a X-SUBJECT header for the owning tenant
+GET /v1/admin/short-url
+POST /v1/admin/short-url
+POST /v1/admin/short-url/:short_url # POST chosen because write is not idempotent. Updates are not supported
+DELETE /v1/admin/short-url/:short_url
 
-    This URL shortener should have a well-defined API for URLs created, including analytics of usage.
+# Analytics APIs
+GET /v1/admin/short-url/:short_url/analytics/24h
+GET /v1/admin/short-url/:short_url/analytics/7d
+GET /v1/admin/short-url/:short_url/analytics/all
 
-    No duplicate URLs are allowed to be created.
+# Short URL Redirection
+GET /s/:short_url
+```
 
-    Short links can expire at a future time or can live forever.
+The write endpoints have the following request body:
+```json
+{
+    "url": "some http endpoint",
+    "expiry": "Optional: Some ISO-8601 datetime after which the short-url is disabled" 
+}
+```
 
+A developer should be able to to enumerate all short_urls that they own, and from their manage their urls (i.e. Create, Delete, etc.).
 
-Your solution must support: 
+Some examples cURL requests below:
+```bash
+# example redirect to pre-loaded short url
+curl -H X-SUBJECT:e2e-test localhost:8080/s/test1
 
-    Generating a short url from a long url 
+# Example list all short_urls for the `e2e-test` tenant
+curl -H X-SUBJECT:e2e-test localhost:8080/v1/admin/short-urls | jq
 
-     Redirecting a short url to a long url. 
+# Example auto-generated short url
+curl -H X-SUBJECT:e2e-test -X POST localhost:8080/v1/admin/short-urls -d '{ "url": "http://foo.bar" }' | jq
 
-    List the number of times a short url has been accessed in the last 24 hours, past week, and all time. 
+# Example create a named short url with some expiry
+curl -H X-SUBJECT:e2e-test -X POST localhost:8080/v1/admin/short-urls/named -d '{ "url": "http://foo.bar", "expireAt": "2021-02-18T21:54:42.123Z" }' | jq
 
-     Data persistence ( must survive computer restarts) 
+# Example delete a named short url
+curl -H X-SUBJECT:e2e-test -X DELETE localhost:8080/v1/admin/short-urls/named
 
-     Metrics and/or logging: Implement metrics or logging for the purposes of troubleshooting and alerting. This is optional.
+# Example analytics queries
+curl http://localhost:8080/v1/admin/short-urls/test1/analytics/24h # Past 24 hours
+curl http://localhost:8080/v1/admin/short-urls/test1/analytics/7d  # Past 7 days
+curl http://localhost:8080/v1/admin/short-urls/test1/analytics/all # For all time
+```
 
-    Short links can be deleted
+## Operating Instructions
+This demo assumes you have docker installed locally and can run `docker-compose`.
 
+### Build
+To (re-)build this demo, run the following:
+```sh
+docker-compose build
+```
 
-Project Requirements:
+### Run service locally
+To run locally in the background:
+```sh
+docker-compose up -d
+```
 
-    This project should be able to be runnable locally with  some simple instructions
+To run with integrated logging for all services:
+```sh
+docker-compose up
+```
 
-    This project's documentation should include build and deploy instruction
+### Test
+After starting the local docker-compose instance (both the service on port 8080 and postgres on port 5432), navigate to `./url-shortener/` and run:
+```bash
+go test -v
+```
 
-    Tests should be provided and able to be executed locally or within a test environment.
-
-## Note
-There's a [known bug](https://github.com/golang/go/pull/50339) in go's built-in reverse proxy library around trailing slashes. So for the purposes of this demo, I will require all destination URLs to support trailing/strict slashes.
+to execute the integration tests

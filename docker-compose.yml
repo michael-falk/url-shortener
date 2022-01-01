@@ -9,17 +9,18 @@ services:
     image: postgres:latest
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ./db/data.sql:/docker-entrypoint-initdb.d/2-data.sql
     ports:
       - 5432:5432
     env_file:
       - .env
 
   url-shortener:
-    depends_on:
+    image: url-shortener
+    links:
       - db
-    build: 
-      context: .
-      dockerfile: url-shortener.dockerfile
+    build: url-shortener
     ports:
       - 8080:80
 
