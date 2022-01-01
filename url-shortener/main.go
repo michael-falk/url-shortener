@@ -20,6 +20,14 @@ type NewShortLinkRequest struct {
 	ExpireAt *time.Time `json:"expireAt,omitempty"` // RFC3339 datetime
 }
 
+type NewShortLinkResponse struct {
+	ShortLink string `json:"shortUrl"`
+}
+
+type ListShortLinkResponse struct {
+	Urls []string `json:"urls"`
+}
+
 // From https://golangdocs.com/generate-random-string-in-golang
 // Decided for case-insensitivity so lowercase only
 func RandomString(n int) string {
@@ -30,6 +38,30 @@ func RandomString(n int) string {
 		s[i] = letters[r.Intn(len(letters))]
 	}
 	return string(s)
+}
+
+func ListShortLinks(conn *pgxpool.Pool) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tenant := r.Header.Get("X-SUBJECT")
+		urls := make([]string, 0)
+
+		rows, _ := conn.Query(context.Background(), "SELECT short_link FROM urls WHERE tenant=$1", tenant)
+
+		var url string
+		for rows.Next() {
+
+			rows.Scan(&url)
+			urls = append(urls, url)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		resp := ListShortLinkResponse{
+			Urls: urls,
+		}
+		jsonResp, _ := json.Marshal(resp)
+		w.Write(jsonResp)
+	}
 }
 
 // TODO auth so that owning engineering tenant will have permissions to call the WRITE admin route for the short link. Using JWT semantics. Will not verify tokens. just check `sub` to identify tenant for short-links.
@@ -95,8 +127,11 @@ func HandleNewShortLinkRequest(conn *pgxpool.Pool, tenant, id string, req NewSho
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	resp := make(map[string]string)
-	resp["shortLink"] = id
+
+	resp := NewShortLinkResponse{
+		ShortLink: id,
+	}
+
 	jsonResp, _ := json.Marshal(resp)
 	w.Write(jsonResp)
 }
@@ -197,6 +232,7 @@ func main() {
 	router := mux.NewRouter()
 
 	shortLinkRouter := router.PathPrefix("/v1/admin/short-link").Subrouter()
+	shortLinkRouter.HandleFunc("", ListShortLinks(conn)).Methods("GEt")
 	shortLinkRouter.HandleFunc("", CreateRandomShortLink(conn)).Methods("POST")
 	shortLinkRouter.HandleFunc("/{short_link}", CreateNamedShortLink(conn)).Methods("POST")
 	shortLinkRouter.HandleFunc("/{short_link}", DeleteShortLink(conn)).Methods("DELETE")

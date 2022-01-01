@@ -27,6 +27,8 @@ The Web API should be a straight-forward CRUD API to create a short-url and a sh
 The routes are as follow:
 ```
 # Management APIs
+# Requires a X-SUBJECT header for the owning tenant
+GET /v1/admin/short-link
 POST /v1/admin/short-link
 POST /v1/admin/short-link/:short_url # POST chosen because write is not idempotent. Updates are not supported
 DELETE /v1/admin/short-link/:short_url
@@ -47,6 +49,8 @@ The write endpoints have the following request body:
     "expiry": "Optional: Some ISO-8601 datetime after which the short-url is disabled" 
 }
 ```
+
+A developer should be able to to enumerate all short_urls that they own, and from their manage their urls (i.e. Create, Delete, etc.).
 
 ## Operating Instructions
 This demo assumes you have docker installed locally and can run `docker-compose`.
