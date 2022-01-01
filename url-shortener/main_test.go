@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -60,6 +62,105 @@ func TestAnalytics24h(t *testing.T) {
 	body, _ := ioutil.ReadAll(resp.Body)
 	assert.Equal(t, 200, resp.StatusCode, "OK response is expected")
 	assert.Equal(t, fmt.Sprintf("%s has been called 1 times in 24 HOURS\n", analyticsShortUrl), string(body), "1 use expected")
+}
+
+func RequestNewRandomShortUrl(url string) string {
+	jsonData, _ := json.Marshal(NewShortUrlRequest{Url: url})
+
+	client := http.Client{}
+	req, err := http.NewRequest("POST", "http://localhost:8080/v1/admin/short-urls", bytes.NewBuffer(jsonData))
+	if err != nil {
+		//Handle Error
+	}
+
+	req.Header = http.Header{
+		"Content-Type": []string{"application/json"},
+		"X-SUBJECT":    []string{"test"},
+	}
+
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()
+
+	var respBody NewShortUrlResponse
+	body, _ := ioutil.ReadAll(resp.Body)
+	json.Unmarshal(body, &respBody)
+
+	return respBody.ShortUrl
+}
+
+func RequestNewNamedShortUrl(name, url string) string {
+	jsonData, _ := json.Marshal(NewShortUrlRequest{Url: url})
+
+	client := http.Client{}
+	req, _ := http.NewRequest("POST", fmt.Sprintf("http://localhost:8080/v1/admin/short-urls/%s", name), bytes.NewBuffer(jsonData))
+
+	req.Header = http.Header{
+		"Content-Type": []string{"application/json"},
+		"X-SUBJECT":    []string{"test"},
+	}
+
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()
+
+	var respBody NewShortUrlResponse
+	body, _ := ioutil.ReadAll(resp.Body)
+	json.Unmarshal(body, &respBody)
+
+	return respBody.ShortUrl
+}
+
+func RequestListShortUrls() []string {
+	client := http.Client{}
+	req, _ := http.NewRequest("GET", "http://localhost:8080/v1/admin/short-urls", nil)
+
+	req.Header = http.Header{
+		"Content-Type": []string{"application/json"},
+		"X-SUBJECT":    []string{"test"},
+	}
+
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()
+
+	var respBody ListShortUrlResponse
+	body, _ := ioutil.ReadAll(resp.Body)
+	json.Unmarshal(body, &respBody)
+
+	return respBody.Urls
+}
+
+func RequestDeleteShortUrl(name string) {
+	client := http.Client{}
+	req, _ := http.NewRequest("DELETE", fmt.Sprintf("http://localhost:8080/v1/admin/short-urls/%s", name), nil)
+
+	req.Header = http.Header{
+		"Content-Type": []string{"application/json"},
+		"X-SUBJECT":    []string{"test"},
+	}
+
+	client.Do(req)
+}
+
+func TestCreateListAndDeleteRandom(t *testing.T) {
+	url := RequestNewRandomShortUrl("https://www.cloudflare.com/")
+	urls := RequestListShortUrls()
+	assert.Contains(t, urls, url, "Expected URL to be listed")
+
+	RequestDeleteShortUrl(url)
+	urls = RequestListShortUrls()
+	assert.NotContains(t, urls, url, "Expected URL to not be listed")
+}
+
+func TestCreateListAndDeleteNamed(t *testing.T) {
+	name := RandomString(6)
+	url := RequestNewNamedShortUrl(name, "https://www.cloudflare.com/")
+	assert.Equal(t, name, url, "Expected chosen URL to be the returned URL")
+
+	urls := RequestListShortUrls()
+	assert.Contains(t, urls, url, "Expected URL to be listed")
+
+	RequestDeleteShortUrl(url)
+	urls = RequestListShortUrls()
+	assert.NotContains(t, urls, url, "Expected URL to not be listed")
 }
 
 var analyticsShortUrl string
