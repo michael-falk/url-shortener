@@ -33,8 +33,8 @@ func LoadTestUsage(conn *pgxpool.Pool, id string) {
 	}
 }
 
-func UnloadTestUsage(conn *pgxpool.Pool, id string) {
-	_, err := conn.Exec(context.Background(), "DELETE FROM usage WHERE short_url=$1", id)
+func UnloadTestUsage(conn *pgxpool.Pool) {
+	_, err := conn.Exec(context.Background(), "DELETE FROM urls WHERE tenant=$1", "integration_test")
 	if err != nil {
 		panic(err)
 	}
@@ -75,7 +75,7 @@ func RequestNewRandomShortUrl(url string) string {
 
 	req.Header = http.Header{
 		"Content-Type": []string{"application/json"},
-		"X-SUBJECT":    []string{"test"},
+		"X-SUBJECT":    []string{"integration_test"},
 	}
 
 	resp, _ := client.Do(req)
@@ -96,7 +96,7 @@ func RequestNewNamedShortUrl(name, url string) string {
 
 	req.Header = http.Header{
 		"Content-Type": []string{"application/json"},
-		"X-SUBJECT":    []string{"test"},
+		"X-SUBJECT":    []string{"integration_test"},
 	}
 
 	resp, _ := client.Do(req)
@@ -115,7 +115,7 @@ func RequestListShortUrls() []string {
 
 	req.Header = http.Header{
 		"Content-Type": []string{"application/json"},
-		"X-SUBJECT":    []string{"test"},
+		"X-SUBJECT":    []string{"integration_test"},
 	}
 
 	resp, _ := client.Do(req)
@@ -134,7 +134,7 @@ func RequestDeleteShortUrl(name string) {
 
 	req.Header = http.Header{
 		"Content-Type": []string{"application/json"},
-		"X-SUBJECT":    []string{"test"},
+		"X-SUBJECT":    []string{"integration_test"},
 	}
 
 	client.Do(req)
@@ -163,6 +163,18 @@ func TestCreateListAndDeleteNamed(t *testing.T) {
 	assert.NotContains(t, urls, url, "Expected URL to not be listed")
 }
 
+func TestRedirect(t *testing.T) {
+	url := RequestNewRandomShortUrl("https://www.cloudflare.com/")
+
+	resp1, _ := http.Get("https://www.cloudflare.com/")
+	expected := resp1.Header.Get("link")
+
+	resp2, _ := http.Get(fmt.Sprintf("http://localhost:8080/s/%s", url))
+	actual := resp2.Header.Get("link")
+
+	assert.Equal(t, expected, actual, "Expected redirect to match original link header")
+}
+
 var analyticsShortUrl string
 
 func TestMain(m *testing.M) {
@@ -175,7 +187,7 @@ func TestMain(m *testing.M) {
 
 	analyticsShortUrl = RandomString(6)
 	LoadTestUsage(conn, analyticsShortUrl)
-	defer UnloadTestUsage(conn, analyticsShortUrl)
+	defer UnloadTestUsage(conn)
 
 	code := m.Run()
 
