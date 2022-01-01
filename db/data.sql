@@ -1,4 +1,4 @@
-INSERT INTO urls (short_link, tenant, destination)
+INSERT INTO urls (short_url, tenant, destination)
 VALUES (
         'test1',
         'e2e-test',
