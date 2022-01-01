@@ -94,3 +94,11 @@ To run with integrated logging for all services:
 ```sh
 docker-compose up
 ```
+
+### Test
+After starting the local docker-compose instance (both the service on port 8080 and postgres on port 5432), navigate to `./url-shortener/` and run:
+```bash
+go test -v
+```
+
+to execute the integration tests
