@@ -52,6 +52,29 @@ The write endpoints have the following request body:
 
 A developer should be able to to enumerate all short_urls that they own, and from their manage their urls (i.e. Create, Delete, etc.).
 
+Some examples cURL requests below:
+```bash
+# example redirect to pre-loaded short url
+curl -H X-SUBJECT:e2e-test localhost:8080/s/test1
+
+# Example list all short_urls for the `e2e-test` tenant
+curl -H X-SUBJECT:e2e-test localhost:8080/v1/admin/short-urls | jq
+
+# Example auto-generated short url
+curl -H X-SUBJECT:e2e-test -X POST localhost:8080/v1/admin/short-urls -d '{ "url": "http://foo.bar" }' | jq
+
+# Example create a named short url with some expiry
+curl -H X-SUBJECT:e2e-test -X POST localhost:8080/v1/admin/short-urls/named -d '{ "url": "http://foo.bar", "expireAt": "2021-02-18T21:54:42.123Z" }' | jq
+
+# Example delete a named short url
+curl -H X-SUBJECT:e2e-test -X DELETE localhost:8080/v1/admin/short-urls/named
+
+# Example analytics queries
+curl http://localhost:8080/v1/admin/short-urls/test1/analytics/24h # Past 24 hours
+curl http://localhost:8080/v1/admin/short-urls/test1/analytics/7d  # Past 7 days
+curl http://localhost:8080/v1/admin/short-urls/test1/analytics/all # For all time
+```
+
 ## Operating Instructions
 This demo assumes you have docker installed locally and can run `docker-compose`.
 
